@@ -1,0 +1,8 @@
+{
+  "name": "sample-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tiny sample app so the CI scanners have something to scan. No dependencies.",
+  "scripts": { "test": "node --test" }
+}

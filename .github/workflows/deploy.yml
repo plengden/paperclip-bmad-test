@@ -42,7 +42,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify-checks:
+    # CD-side lock: refuse to deploy a commit whose required CI gate did not pass. Rollbacks are exempt.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+    steps:
+      - name: Require a successful ci-gate on this commit
+        if: ${{ inputs.action != 'rollback' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          result=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?per_page=100" \
+            --jq '[.check_runs[]|select(.name=="ci-gate")|.conclusion]|first // "missing"')
+          echo "ci-gate on ${{ github.sha }}: $result"
+          [[ "$result" == "success" ]] || { echo "::error::ci-gate is '$result' for this commit; refusing to deploy"; exit 1; }
+      - name: Rollback skips the CI check
+        if: ${{ inputs.action == 'rollback' }}
+        run: echo "rollback: CI check not required"
+
   deploy:
+    needs: verify-checks
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
