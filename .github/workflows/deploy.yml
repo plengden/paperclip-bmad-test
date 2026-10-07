@@ -1,18 +1,27 @@
 name: deploy
 
+run-name: ${{ inputs.action || 'deploy' }} ${{ inputs.releaseId }} -> ${{ inputs.environment }}
+
 # Prototype "deploy": validates inputs and records what WOULD be deployed. Deploys nothing real.
 # Triggered only by workflow_dispatch (the Paperclip deploy tool calls this).
 # The production environment has required reviewers, which is the second lock behind Paperclip's approval.
 on:
   workflow_dispatch:
     inputs:
+      action:
+        description: deploy or rollback
+        required: false
+        default: deploy
+        type: choice
+        options: [deploy, rollback]
       releaseId:
         description: Release id (e.g. rel-5)
         required: true
         type: string
       artifactDigest:
-        description: Artifact digest (sha256:<64 hex>)
-        required: true
+        description: Artifact digest (sha256:<64 hex>); required for deploy, ignored for rollback
+        required: false
+        default: ''
         type: string
       environment:
         description: Target environment
@@ -39,13 +48,17 @@ jobs:
     steps:
       - name: Validate inputs
         env:
+          ACTION: ${{ inputs.action }}
           RELEASE_ID: ${{ inputs.releaseId }}
           DIGEST: ${{ inputs.artifactDigest }}
         run: |
           [[ "$RELEASE_ID" =~ ^[A-Za-z0-9._-]{1,64}$ ]] || { echo "bad releaseId"; exit 1; }
-          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "bad artifactDigest"; exit 1; }
+          if [[ "$ACTION" != "rollback" ]]; then
+            [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "bad artifactDigest"; exit 1; }
+          fi
       - name: Record deployment (no real deploy)
         env:
+          ACTION: ${{ inputs.action }}
           RELEASE_ID: ${{ inputs.releaseId }}
           DIGEST: ${{ inputs.artifactDigest }}
           ENVIRONMENT: ${{ inputs.environment }}
@@ -55,6 +68,7 @@ jobs:
             echo "## Deployment record (prototype, nothing deployed)"
             echo "| field | value |"
             echo "|---|---|"
+            echo "| action | ${ACTION:-deploy} |"
             echo "| release | $RELEASE_ID |"
             echo "| artifact | $DIGEST |"
             echo "| environment | $ENVIRONMENT |"
