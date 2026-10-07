@@ -1,5 +1,6 @@
 name: ci
 
+# Required checks. Evidence is PULLED by Paperclip's ci_evidence tool (reads these jobs and the app-sha256-<digest> artifact name).
 # Required checks. `ci-gate` is the single status that branch protection requires and that deploy.yml verifies.
 # Third-party actions are pinned by tag for this prototype; pin by commit SHA before real use.
 on:
@@ -55,15 +56,18 @@ jobs:
     needs: [test]
     outputs:
       digest: ${{ steps.d.outputs.digest }}
+      hex: ${{ steps.d.outputs.hex }}
     steps:
       - uses: actions/checkout@v4
       - id: d
         name: Package app and compute digest
         run: |
           tar --sort=name --mtime='UTC 2020-01-01' --owner=0 --group=0 --numeric-owner -cf app.tar app
-          echo "digest=sha256:$(sha256sum app.tar | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          hex=$(sha256sum app.tar | cut -d' ' -f1)
+          echo "digest=sha256:$hex" >> "$GITHUB_OUTPUT"
+          echo "hex=$hex" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
-        with: { name: app-tar, path: app.tar }
+        with: { name: 'app-sha256-${{ steps.d.outputs.hex }}', path: app.tar }
 
   ci-gate:
     runs-on: ubuntu-latest
@@ -76,19 +80,3 @@ jobs:
         run: |
           echo "$RESULTS" | jq -r 'to_entries[]|"\(.key): \(.value.result)"'
           echo "$RESULTS" | jq -e 'all(.[]; .result == "success")' > /dev/null
-
-  evidence:
-    # Posts check results + artifact digest to the Paperclip release issue named by a commit trailer
-    # ("Paperclip-Issue: SDL-9"). Skips quietly when no trailer or no credentials are configured.
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [ci-gate, build, test, secrets, sast, deps]
-    env:
-      PAPERCLIP_URL: ${{ vars.PAPERCLIP_URL }}
-      PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
-      DIGEST: ${{ needs.build.outputs.digest }}
-      RESULTS: ${{ toJSON(needs) }}
-      RELEASE_ID: ci-${{ github.run_number }}
-    steps:
-      - uses: actions/checkout@v4
-      - run: bash .github/scripts/post_evidence.sh
