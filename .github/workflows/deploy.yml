@@ -1,0 +1,65 @@
+name: deploy
+
+# Prototype "deploy": validates inputs and records what WOULD be deployed. Deploys nothing real.
+# Triggered only by workflow_dispatch (the Paperclip deploy tool calls this).
+# The production environment has required reviewers, which is the second lock behind Paperclip's approval.
+on:
+  workflow_dispatch:
+    inputs:
+      releaseId:
+        description: Release id (e.g. rel-5)
+        required: true
+        type: string
+      artifactDigest:
+        description: Artifact digest (sha256:<64 hex>)
+        required: true
+        type: string
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options: [staging, production]
+      riskClass:
+        description: Risk class
+        required: true
+        type: choice
+        options: [low, medium, high]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Validate inputs
+        env:
+          RELEASE_ID: ${{ inputs.releaseId }}
+          DIGEST: ${{ inputs.artifactDigest }}
+        run: |
+          [[ "$RELEASE_ID" =~ ^[A-Za-z0-9._-]{1,64}$ ]] || { echo "bad releaseId"; exit 1; }
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "bad artifactDigest"; exit 1; }
+      - name: Record deployment (no real deploy)
+        env:
+          RELEASE_ID: ${{ inputs.releaseId }}
+          DIGEST: ${{ inputs.artifactDigest }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          RISK: ${{ inputs.riskClass }}
+        run: |
+          {
+            echo "## Deployment record (prototype, nothing deployed)"
+            echo "| field | value |"
+            echo "|---|---|"
+            echo "| release | $RELEASE_ID |"
+            echo "| artifact | $DIGEST |"
+            echo "| environment | $ENVIRONMENT |"
+            echo "| riskClass | $RISK |"
+            echo "| actor | ${{ github.actor }} |"
+            echo "| run | ${{ github.run_id }} |"
+            echo "| sha | ${{ github.sha }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
