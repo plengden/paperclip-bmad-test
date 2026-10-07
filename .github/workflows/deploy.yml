@@ -60,7 +60,7 @@ jobs:
           [[ "$result" == "success" ]] || { echo "::error::ci-gate is '$result' for this commit; refusing to deploy"; exit 1; }
       - name: Rollback skips the CI check
         if: ${{ inputs.action == 'rollback' }}
-        run: echo "rollback: CI check not required"
+        run: echo 'rollback - CI check not required'
 
   deploy:
     needs: verify-checks
