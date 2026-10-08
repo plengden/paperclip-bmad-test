@@ -69,6 +69,29 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: 'app-sha256-${{ steps.d.outputs.hex }}', path: app.tar }
 
+  risk-class:
+    # Computes the change's risk class from the diff (deterministic rules, decision 1). Evidence only: not part of ci-gate.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Classifier unit tests
+        run: node --test .github/scripts/classify.test.mjs
+      - id: c
+        name: Classify
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          node .github/scripts/classify.mjs "$BASE" "$HEAD" | tee risk-class.json
+          echo "class=$(jq -r .class risk-class.json)" >> "$GITHUB_OUTPUT"
+          { echo "### Risk class: $(jq -r .class risk-class.json)"; jq -r '.reasons[] | "- " + .' risk-class.json; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with: { name: 'risk-class-${{ steps.c.outputs.class }}', path: risk-class.json }
+
   ci-gate:
     runs-on: ubuntu-latest
     if: always()
