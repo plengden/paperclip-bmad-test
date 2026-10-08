@@ -13,6 +13,12 @@ test("min equal to max returns that bound", () => assert.equal(clamp(7, 3, 3), 3
 test("infinite bounds are allowed", () => {
   assert.equal(clamp(5, -Infinity, Infinity), 5);
   assert.equal(clamp(Infinity, 0, 10), 10);
+  assert.equal(clamp(-Infinity, 0, 10), 0);
+});
+test("fractional values and bounds are not rounded", () => {
+  assert.equal(clamp(0.25, 0, 1), 0.25);
+  assert.equal(clamp(0.1, 0.5, 1.5), 0.5);
+  assert.equal(clamp(2.75, 0.5, 1.5), 1.5);
 });
 test("min greater than max throws RangeError", () => assert.throws(() => clamp(1, 10, 0), RangeError));
 test("non-number or NaN arguments throw TypeError", () => {
