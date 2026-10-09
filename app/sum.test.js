@@ -10,5 +10,5 @@ test("non-array throws TypeError", () => {
   assert.throws(() => sum(new Set([1, 2])), TypeError);
 });
 test("non-finite or non-number elements throw TypeError", () => {
-  for (const bad of [NaN, Infinity, "1", null, undefined]) assert.throws(() => sum([1, bad]), TypeError);
+  for (const bad of [NaN, Infinity, -Infinity, "1", null, undefined]) assert.throws(() => sum([1, bad]), TypeError);
 });
